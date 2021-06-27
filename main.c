@@ -367,7 +367,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 		diferencia = valor2 - valor1;
 	 }
 	 else if (valor2 < valor1){
-		diferencia = ((65535 - valor1)+valor2)+1;
+		diferencia = ((65536 - valor1)+valor2)+1;
 	 }
 	 frecuencia= HAL_RCC_GetPCLK1Freq()/diferencia;
 	}
