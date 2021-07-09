@@ -14,6 +14,9 @@
 	*					 Tambien se va a generar una señal PWM a traves de un canal del 
 	*					 Timer. Y por último se va a capturar una señal cuadrada y se va 
 	*					 a calcular su frecuencia
+	*					 
+	*					 Pin de generacion de la señal PWM-> PC6
+	*					 Pin de captura de la señal-> PD12
   *
   * @note    modified by ARM
   *          The modifications allow to use this file as User Code Template
@@ -198,7 +201,7 @@ static void SystemClock_Config(void)
 }
 
 /**
-  * @brief GPIO Initialization Function
+  * @brief Función de inicialización del LED 2 (LED azul)
   * @param None
   * @retval None
   */
@@ -227,7 +230,8 @@ static void MX_GPIO_Init(void)
 
 }
 /**
-  * @brief TIM3 Initialization Function
+  * @brief TIM3 Initialization Function. Habilitación de interrupción del contador con frecuencia 8772 Hz y
+	* 			 generación de la señal PWM en el canal 1.
   * @param None
   * @retval None
   */
@@ -301,7 +305,7 @@ static void MX_TIM3_Init(void)
 
 }
 /**
-  * @brief TIM4 Initialization Function
+  * @brief Funcion de inicializacion del TIM4 para capturar la señal a traves del canal 1
   * @param None
   * @retval None
   */
