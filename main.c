@@ -10,13 +10,17 @@
 	*					 -Generar señales a traves del Timer
 	* 			
 	*					 Para ello se va a realizar el encendido y apagado de un LED con 
-	*					 la frecuencia generada por un Timer, a traves de una interrupción. 
-	*					 Tambien se va a generar una señal PWM a traves de un canal del 
-	*					 Timer. Y por último se va a capturar una señal cuadrada y se va 
-	*					 a calcular su frecuencia
+	*					 la frecuencia generada por el Timer 3, a traves de una interrupción. 
+	*					 Tambien se va a generar una señal PWM a traves de un canal 1 del 
+	*					 Timer 3. Y por último se va a capturar la señal PWM y se va 
+	*					 a calcular su frecuencia mediante el canal 1 del Timer 4.
 	*					 
 	*					 Pin de generacion de la señal PWM-> PC6
 	*					 Pin de captura de la señal-> PD12
+	*						
+	*					 Frecuencia de la señal PWM generada = 37.500 Hz
+	*					 Frecuencia del Timer de captura = 1.144 Hz
+	*						
   *
   * @note    modified by ARM
   *          The modifications allow to use this file as User Code Template
@@ -62,9 +66,10 @@ uint32_t HAL_GetTick (void) {
 
 
 /* Private variables ---------------------------------------------------------*/
-
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+
 uint8_t primera = 0;
 uint32_t	valor1 = 0;
 uint32_t	valor2 = 0;
@@ -76,6 +81,7 @@ static void SystemClock_Config(void);
 static void Error_Handler(void);
 
 /* Private functions ---------------------------------------------------------*/
+static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM4_Init(void);
@@ -106,11 +112,12 @@ int main(void)
   /* Add your application code here
      */
 	MX_GPIO_Init();
+	MX_TIM2_Init();
 	MX_TIM3_Init();
 	MX_TIM4_Init();
 	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_TIM_Base_Start_IT(&htim2);
 	
 	
 
@@ -135,14 +142,14 @@ int main(void)
   * @brief  System Clock Configuration
   *         The system Clock is configured as follow : 
   *            System Clock source            = PLL (HSE)
-  *            SYSCLK(Hz)                     = 168000000
-  *            HCLK(Hz)                       = 168000000
+  *            SYSCLK(Hz)                     = 150000000
+  *            HCLK(Hz)                       = 150000000
   *            AHB Prescaler                  = 1
   *            APB1 Prescaler                 = 4
   *            APB2 Prescaler                 = 2
-  *            HSE Frequency(Hz)              = 8000000
-  *            PLL_M                          = 25
-  *            PLL_N                          = 336
+  *            HSE Frequency(Hz)              = 25000000
+  *            PLL_M                          = 12
+  *            PLL_N                          = 144
   *            PLL_P                          = 2
   *            PLL_Q                          = 7
   *            VDD(V)                         = 3.3
@@ -169,8 +176,8 @@ static void SystemClock_Config(void)
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 25;
-  RCC_OscInitStruct.PLL.PLLN = 336;
+  RCC_OscInitStruct.PLL.PLLM = 12;
+  RCC_OscInitStruct.PLL.PLLN = 144;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -229,9 +236,39 @@ static void MX_GPIO_Init(void)
 
 
 }
+static void MX_TIM2_Init(void){
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+	TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0x23B;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 0xffff;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
 /**
-  * @brief TIM3 Initialization Function. Habilitación de interrupción del contador con frecuencia 8772 Hz y
-	* 			 generación de la señal PWM en el canal 1.
+  * @brief TIM3 Initialization Function. Generación de la señal PWM en el canal 1.
   * @param None
   * @retval None
   */
@@ -256,29 +293,26 @@ static void MX_TIM3_Init(void)
   htim3.Init.Period = 1999;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
 
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+
+  //sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  //if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  //{
+  // Error_Handler();
+  //}
 		if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  /*sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
-  }
+  }*/
   /* USER CODE BEGIN TIM3_Init 2 */
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 2000/2;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
 	sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -288,7 +322,7 @@ static void MX_TIM3_Init(void)
   {
     Error_Handler();
   }
-	sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+	/*sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
   sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
   sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
   sBreakDeadTimeConfig.DeadTime = 0;
@@ -299,9 +333,7 @@ static void MX_TIM3_Init(void)
   {
     Error_Handler();
   }
-	
-	HAL_TIM_MspPostInit(&htim3);
-  /* USER CODE END TIM3_Init 2 */
+	*/  /* USER CODE END TIM3_Init 2 */
 
 }
 /**
@@ -314,32 +346,31 @@ static void MX_TIM4_Init(void)
 
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_IC_InitTypeDef sConfigIC = {0};
-
-  htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 20;
-  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 65535;
-  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim4.Instance = TIM4;
+  htim4.Init.Period            = 0xffff;
+  htim4.Init.Prescaler         = 0;
+  htim4.Init.ClockDivision     = 0;
+  htim4.Init.CounterMode       = TIM_COUNTERMODE_UP;
+  htim4.Init.RepetitionCounter = 0;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_IC_Init(&htim4) != HAL_OK)
+  if(HAL_TIM_IC_Init(&htim4) != HAL_OK)
   {
+    /* Initialization Error */
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+
+  /*##-2- Configure the Input Capture channel ################################*/ 
+  /* Configure the Input Capture of channel 2 */
+  sConfigIC.ICPolarity  = TIM_ICPOLARITY_RISING;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
   sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
-  sConfigIC.ICFilter = 0;
-  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  sConfigIC.ICFilter    = 0;   
+  if(HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
   {
+    /* Configuration Error */
     Error_Handler();
   }
-
+  
 }
 /**
   * @brief Función de callback del Timer para realizar el encendido del LED
@@ -348,7 +379,7 @@ static void MX_TIM4_Init(void)
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 { 
-	if(htim == &htim3)
+	if(htim == &htim2)
 	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_7);
 }
 /**
@@ -360,20 +391,20 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
  if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1){
   if(primera == 0) {
-   valor1 = HAL_TIM_ReadCapturedValue(&htim4, TIM_CHANNEL_1);
+   valor1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
    primera = 1;
   }
 
   else if (primera == 1){
-	 valor2 = HAL_TIM_ReadCapturedValue(&htim4, TIM_CHANNEL_1);
+	 valor2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
 	 primera = 0;
 	 if(valor2 > valor1){
 		diferencia = valor2 - valor1;
 	 }
 	 else if (valor2 < valor1){
-		diferencia = ((65536 - valor1)+valor2)+1;
+		diferencia = ((0xffff - valor1)+valor2)+1;
 	 }
-	 frecuencia= HAL_RCC_GetPCLK1Freq()/diferencia;
+	 frecuencia= 2*HAL_RCC_GetPCLK1Freq()/diferencia;
 	}
 }
 }
