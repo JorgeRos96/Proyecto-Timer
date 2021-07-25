@@ -8,19 +8,28 @@
 	*					 -Apagar/encender un led con un intervalo ajustable
 	*					 -Capturar señales a traves de un canal del Timer
 	*					 -Generar señales a traves del Timer
-	* 			
+	* 				
 	*					 Para ello se va a realizar el encendido y apagado de un LED con 
 	*					 la frecuencia generada por el Timer 2, a traves de una interrupción. 
 	*					 Tambien se va a generar una señal PWM a traves de un canal 1 del 
-	*					 Timer 3. Y por último se va a capturar la señal PWM y se va 
-	*					 a calcular su frecuencia mediante el canal 1 del Timer 4.
+	*					 Timer 3 con un ciclo de tabajo del 50%. Y por último se va a capturar
+	*				   la señal PWM y se va a calcular su frecuencia a traves del canal 1 
+	*					 del Timer 4.
 	*					 
 	*					 Pin de generacion de la señal PWM-> PC6
 	*					 Pin de captura de la señal-> PD12
 	*						
-	*					 Frecuencia de la señal PWM generada = 37.500 Hz
-	*					 Frecuencia del Timer de captura = 1.144 Hz
+	*					 Se configura el reloj del sistema para que trabaje a una frecuencia 
+	*					 de 180 MHz utilizando como fuente de reloj el PLL con el HSI. Con 
+	*					 esta frecuencia del sistema se configuran las siguientes frecuencias:
+	*
+	*					 Frecuencia del Timer 2 = 2.4 Hz
+	*					 Frecuencia de la señal PWM generada = 45 kHz
+	*					 Frecuencia del Timer de captura = 1.37 kHz
 	*						
+	*					 La frecuencia minima que debe tener la señal introducida para que 
+	*					 pueda ser capturada por el Timer 3 es la frecuencia del Timer 
+	*					 (1.37 kHz) 
   *
   * @note    modified by ARM
   *          The modifications allow to use this file as User Code Template
