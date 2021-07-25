@@ -10,7 +10,7 @@
 	*					 -Generar señales a traves del Timer
 	* 			
 	*					 Para ello se va a realizar el encendido y apagado de un LED con 
-	*					 la frecuencia generada por el Timer 3, a traves de una interrupción. 
+	*					 la frecuencia generada por el Timer 2, a traves de una interrupción. 
 	*					 Tambien se va a generar una señal PWM a traves de un canal 1 del 
 	*					 Timer 3. Y por último se va a capturar la señal PWM y se va 
 	*					 a calcular su frecuencia mediante el canal 1 del Timer 4.
@@ -32,36 +32,14 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "LED.h"
+#include "USART.h"
+#include "Delay.h"
 
 #ifdef _RTE_
 #include "RTE_Components.h"             // Component selection
 #endif
-#ifdef RTE_CMSIS_RTOS2                  // when RTE component CMSIS RTOS2 is used
-#include "cmsis_os2.h"                  // ::CMSIS:RTOS2
-#endif
 
-#ifdef RTE_CMSIS_RTOS2_RTX5
-/**
-  * Override default HAL_GetTick function
-  */
-uint32_t HAL_GetTick (void) {
-  static uint32_t ticks = 0U;
-         uint32_t i;
-
-  if (osKernelGetState () == osKernelRunning) {
-    return ((uint32_t)osKernelGetTickCount ());
-  }
-
-  /* If Kernel is not running wait approximately 1 ms then increment 
-     and return auxiliary tick counter value */
-  for (i = (SystemCoreClock >> 14U); i > 0U; i--) {
-    __NOP(); __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
-    __NOP(); __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
-  }
-  return ++ticks;
-}
-
-#endif
 
 
 
@@ -75,10 +53,12 @@ uint32_t	valor1 = 0;
 uint32_t	valor2 = 0;
 uint32_t	diferencia = 0;
 uint32_t	frecuencia = 0;
+char buf[100];
+int size = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
-static void Error_Handler(void);
+static void Error_Handler(int fallo);
 
 /* Private functions ---------------------------------------------------------*/
 static void MX_TIM2_Init(void);
@@ -103,148 +83,148 @@ int main(void)
              handled in milliseconds basis.
        - Low Level Initialization
      */
-  HAL_Init();
+	if (HAL_Init() != HAL_OK)
+		Error_Handler(0);
 
-  /* Configure the system clock to 168 MHz */
+  /* Inicialización y configuración del reloj a 168 MHz */
   SystemClock_Config();
   SystemCoreClockUpdate();
+	
+	/* Inicialización de la USART a traves de la función init_USART de la libreria USART
+	*	 y habilitación de la transmisión
+	*							- Baudrate = 9600 baud
+	*							- Word length = 8 bits
+	*							- Un bit de stop
+	*							- Sin bit de paridad
+	*							- Sin control de flujo
+	*/
+	if (init_USART() != 0)
+		Error_Handler(2);
 
-  /* Add your application code here
-     */
-	MX_GPIO_Init();
+  /* Inicialización de los LEDs de la tarjeta*/
+	LED_Init();
+	/*Inicialización de los Timers*/
 	MX_TIM2_Init();
 	MX_TIM3_Init();
 	MX_TIM4_Init();
+	/*Inicializaciñon del Delay*/
+	Init_Delay(180,4);
+	/*Habilitación del Timer de captura en el Timer 4 canal 1*/
 	HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1);
+	/*Habilitación del Timer para la generación de la señal PWM en el Timer 4 canal 1*/
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+	/*Habilitación del  Timer 2 con la generación de señal de interrupción*/
 	HAL_TIM_Base_Start_IT(&htim2);
 	
+	Delay_ms(1);
+	/* Texto que se desea enviar*/
+	size = sprintf(buf,"\rLa frecuencia de la senal capturada es: %d Hz\n", frecuencia);
+	/* Envío del array al terminal a traves de la función tx_USART de la librería USART*/
+	if (tx_USART(buf, size) != 0)
+		Error_Handler(3);
+		
 	
-
-#ifdef RTE_CMSIS_RTOS2
-  /* Initialize CMSIS-RTOS2 */
-  osKernelInitialize ();
-
-  /* Create thread functions that start executing, 
-  Example: osThreadNew(app_main, NULL, NULL); */
-
-  /* Start thread execution */
-  osKernelStart();
-#endif
-
   /* Infinite loop */
   while (1)
-  {
+  {	
+		
   }
 }
 
 /**
   * @brief  System Clock Configuration
   *         The system Clock is configured as follow : 
-  *            System Clock source            = PLL (HSE)
-  *            SYSCLK(Hz)                     = 150000000
-  *            HCLK(Hz)                       = 150000000
+  *            System Clock source            = PLL (HSI)
+  *            SYSCLK(Hz)                     = 180000000
+  *            HCLK(Hz)                       = 180000000
   *            AHB Prescaler                  = 1
   *            APB1 Prescaler                 = 4
   *            APB2 Prescaler                 = 2
-  *            HSE Frequency(Hz)              = 25000000
-  *            PLL_M                          = 12
-  *            PLL_N                          = 144
+  *            HSE Frequency(Hz)              = 16000000
+  *            PLL_M                          = 8
+  *            PLL_N                          = 180
   *            PLL_P                          = 2
-  *            PLL_Q                          = 7
+  *            PLL_Q                          = 4
   *            VDD(V)                         = 3.3
   *            Main regulator output voltage  = Scale1 mode
   *            Flash Latency(WS)              = 5
   * @param  None
   * @retval None
   */
-static void SystemClock_Config(void)
+void SystemClock_Config(void)
 {
-  RCC_ClkInitTypeDef RCC_ClkInitStruct;
-  RCC_OscInitTypeDef RCC_OscInitStruct;
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /* Enable Power Control clock */
+  /** Configure the main internal regulator output voltage
+  */
   __HAL_RCC_PWR_CLK_ENABLE();
-
-  /* The voltage scaling allows optimizing the power consumption when the device is 
-     clocked below the maximum system frequency, to update the voltage scaling value 
-     regarding system frequency refer to product datasheet.  */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-  /* Enable HSE Oscillator and activate PLL with HSE as source */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+	
+  /** Se configura el HSI como fuente de reloj del PLL y se configuran
+	* 	los parametros del PLL para ajusta la frecuencia a 180 MHz con una
+	* 	frecuencia del HSI de 16 MHZ (por defecto).
+	* 	SYSCLK =[(16MHz(frecuencia HSI)/8(PLLM))*180 (PLLN)]/2 (PLLP) = 180 MHz
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 12;
-  RCC_OscInitStruct.PLL.PLLN = 144;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 180;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
-  if(HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
-    /* Initialization Error */
-    Error_Handler();
+    Error_Handler(1);
   }
-
-  /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2 
-     clocks dividers */
-  RCC_ClkInitStruct.ClockType = (RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2);
+  /** Se activa el modo de Over Drive para poder alcanzar los 180 MHz
+	* 	como frecuencia del sistema
+  */
+  if (HAL_PWREx_EnableOverDrive() != HAL_OK)
+  {
+    Error_Handler(1);
+  }
+  /** Se selecciona el PLL como fuente de reloj del sistema y se configuran los parametros
+	*		para configurar el HCLK, PCLK1 y PCLK2. La frecuencia máxima del HCLK es 180 MHZ, la 
+	*		frecuencia máxima del PCLK1 es de 45 MHZ y la frecuencia máxima del PCLK2 es de 90 MHz
+	*		HCLK = SYSCK/AHB = 180 MHz / 1 = 180 MHz
+	*		PCLK1 = HCLK/APB1 = 180 MHz / 4 = 45 MHZ
+	*		PCLK2 = HCLK/APB2 = 180 MHz / 2 = 90 MHZ
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;  
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;  
-  if(HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
-  {
-    /* Initialization Error */
-    Error_Handler();
-  }
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  /* STM32F405x/407x/415x/417x Revision Z devices: prefetch is supported */
-  if (HAL_GetREVID() == 0x1001)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
-    /* Enable the Flash prefetch */
-    __HAL_FLASH_PREFETCH_BUFFER_ENABLE();
+    Error_Handler(1);
   }
 }
 
+
 /**
-  * @brief Función de inicialización del LED 2 (LED azul)
+  * @brief Inicialización y configuración del Timer 2 con una frecuencia de 2.4 Hz
+	* 			 Como la frecuencia del sistema es de 180 MHz y el Timer 3 tiene como
+	*				 fuente de reloj el APB1 de 90 MHz, se establece un counter de 65536 y 
+	*				 un prescaler de 572 para tener la frecuencia de 2.4 HZ.
+	*				
+	*					f = 90*10^6/(65536*572) = 2.4 Hz 
   * @param None
   * @retval None
   */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-	__HAL_RCC_GPIOD_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-
-
-  /*Configure GPIO pins : PB0 PB14 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_7;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-
-
-}
 static void MX_TIM2_Init(void){
+	
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 	TIM_OC_InitTypeDef sConfigOC = {0};
   TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
 
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
+	/*Configuración del Timer 2*/
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0x23B;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -253,40 +233,41 @@ static void MX_TIM2_Init(void){
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler(4);
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
   if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler(4);
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler(4);
   }
 }
 /**
-  * @brief TIM3 Initialization Function. Generación de la señal PWM en el canal 1.
+  * @brief Inicialización y configuración del Timer 3 con una frecuencia de 45 kHz
+	* 			 Como la frecuencia del sistema es de 180 MHz y el Timer 3 tiene como
+	*				 fuente de reloj el APB1 de 90 MHz, se establece un counter de 2000 para
+	*				 tener la frecuencia de 45 kHz.
+	*				
+	*					f = 90*10^6/(2000) = 45 kHz 
+	*					
+	*				 También se inicializa el canal 1 del Timer 3 (pin PC6) para la generación
+	* 			 de la señal PWM con un ciclo de trabajo del 50%. 
   * @param None
   * @retval None
   */
 static void MX_TIM3_Init(void)
 {
-
-  /* USER CODE BEGIN TIM3_Init 0 */
-
-  /* USER CODE END TIM3_Init 0 */
-
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 	TIM_OC_InitTypeDef sConfigOC = {0};
   TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
-
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
+ 
+	/*Inicialización del Timer 3*/
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -294,23 +275,11 @@ static void MX_TIM3_Init(void)
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 
-
-  //sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  //if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
-  //{
-  // Error_Handler();
-  //}
 		if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler(5);
   }
-  /*sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }*/
-  /* USER CODE BEGIN TIM3_Init 2 */
+
 	sConfigOC.OCMode = TIM_OCMODE_PWM1;
   sConfigOC.Pulse = 2000/2;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
@@ -320,24 +289,21 @@ static void MX_TIM3_Init(void)
   sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
   if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
-    Error_Handler();
+    Error_Handler(5);
   }
-	/*sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
-  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
-  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBreakDeadTimeConfig.DeadTime = 0;
-  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
-  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
-  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-   if (HAL_TIMEx_ConfigBreakDeadTime(&htim3, &sBreakDeadTimeConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-	*/  /* USER CODE END TIM3_Init 2 */
+
 
 }
 /**
-  * @brief Funcion de inicializacion del TIM4 para capturar la señal a traves del canal 1
+  * @brief Inicialización y configuración del Timer 4 con una frecuencia de 1.37 kHz
+	* 			 Como la frecuencia del sistema es de 180 MHz y el Timer 3 tiene como
+	*				 fuente de reloj el APB1 de 90 MHz, se establece un counter de 65536 para 
+	*				 tener la frecuencia de 1.37 kHZ.
+	*				
+	*					f = 90*10^6/(65536) = 1.37 kHz 
+	*					
+	*				 Ademas se habilita el canal 1 como captura del flanco de subida en el 
+	*				 pin PD12. 
   * @param None
   * @retval None
   */
@@ -346,6 +312,8 @@ static void MX_TIM4_Init(void)
 
   TIM_MasterConfigTypeDef sMasterConfig = {0};
   TIM_IC_InitTypeDef sConfigIC = {0};
+	
+	/*Inicialización del Timer 4*/
 	htim4.Instance = TIM4;
   htim4.Init.Period            = 0xffff;
   htim4.Init.Prescaler         = 0;
@@ -356,10 +324,9 @@ static void MX_TIM4_Init(void)
   if(HAL_TIM_IC_Init(&htim4) != HAL_OK)
   {
     /* Initialization Error */
-    Error_Handler();
+    Error_Handler(6);
   }
 
-  /*##-2- Configure the Input Capture channel ################################*/ 
   /* Configure the Input Capture of channel 2 */
   sConfigIC.ICPolarity  = TIM_ICPOLARITY_RISING;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
@@ -368,28 +335,37 @@ static void MX_TIM4_Init(void)
   if(HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
   {
     /* Configuration Error */
-    Error_Handler();
+    Error_Handler(6);
   }
   
 }
 /**
-  * @brief Función de callback del Timer para realizar el encendido del LED
+  * @brief Función de callback del Timer para realizar el encendido del LED 2 (azul) en el pin PB7
 	* @param htim: Timer que ha realizado la cuenta e invoca a la función de callback  
   * @retval None
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 { 
 	if(htim == &htim2)
-	HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_7);
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_7);
 }
 /**
   * @brief Función de callback del Timer que captura la señal  a traves de la que se
-	*					calcula la frecuencia de la señal capturada.
+	*				 calcula la frecuencia de la señal (cuadrada) capturada. Se captura un flanco
+	*				 de subida y se anota el tiempo hasta el siguiente flanco de subida. Si el 
+	*				 segundo tiempo que se captura es menor que el primero, el tiempo pasado es el
+	*				 periodo total del contador menos el primer valor, más el segundo valor de tiempo.
+	*	
+	*				 La frecuencia se calcula como:
+	*		
+	*				 f = 2*PCLK1/diferencia
+	*
 	* @param htim: Timer que realiza la captura de la señal  
   * @retval None
   */
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
- if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1){
+ 
+	if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1){
   if(primera == 0) {
    valor1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
    primera = 1;
@@ -410,45 +386,33 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 }
 /**
   * @brief  This function is executed in case of error occurrence.
-  * @param  None
+	* @param  fallo: variable que indica donde se ha producido el error
   * @retval None
   */
-static void Error_Handler(void)
+static void Error_Handler(int fallo)
 {
-  /* User may add here some code to deal with this error */
+  if(fallo == 0)
+		/* Mensaje si se ha producido un error en la inicializacón de la librería HAL*/
+		printf(buf,"\r Se ha producido un error al inicializar la librería HAL\n");
+	else if (fallo == 1)
+		/* Mensaje si se ha producido un error en la inicializacón del reloj del sistema*/
+		printf(buf,"\r Se ha producido un error al inicializar el reloj del sistema\n");
+	else if(fallo == 2)
+		/* Mensaje si se ha producido un error en la inicializacón de la USART*/
+		printf(buf,"\r Se ha producido un error al inicializar la USART\n");
+	else if (fallo == 3)
+		/* Mensaje si se ha producido un error en el envío de datos de la USART*/
+		printf(buf,"\r Se ha producido un error al enviar datos por la USART\n");
+	else if (fallo == 4)
+		/* Mensaje si se ha producido un error en la inicialización del Timer 3*/
+		printf(buf,"\r Se ha producido un error al inicializar el Timer 3\n");
+
   while(1)
   {
   }
 }
 
-#ifdef  USE_FULL_ASSERT
 
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t* file, uint32_t line)
-{ 
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 
-  /* Infinite loop */
-  while (1)
-  {
-  }
-}
-
-#endif
-
-/**
-  * @}
-  */ 
-
-/**
-  * @}
-  */ 
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
