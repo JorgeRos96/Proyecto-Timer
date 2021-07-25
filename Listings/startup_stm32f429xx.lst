@@ -889,11 +889,12 @@ Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M4.fp --apcs=int
 erwork --depend=.\objects\startup_stm32f429xx.d -o.\objects\startup_stm32f429xx
 .o -I.\RTE\Device\STM32F429ZITx -I.\RTE\_Target_1 -IC:\Users\User\AppData\Local
 \Arm\Packs\ARM\CMSIS\5.7.0\CMSIS\Core\Include -IC:\Users\User\AppData\Local\Arm
-\Packs\Keil\STM32F4xx_DFP\2.15.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include -IC:
-\Users\User\AppData\Local\Arm\Packs\Keil\STM32F4xx_DFP\2.15.0\Drivers\STM32F4xx
-_HAL_Driver\Inc --predefine="__UVISION_VERSION SETA 528" --predefine="_RTE_ SET
-A 1" --predefine="STM32F429xx SETA 1" --list=.\listings\startup_stm32f429xx.lst
- RTE\Device\STM32F429ZITx\startup_stm32f429xx.s
+\Packs\ARM\CMSIS\5.7.0\CMSIS\Driver\Include -IC:\Users\User\AppData\Local\Arm\P
+acks\Keil\STM32F4xx_DFP\2.15.0\Drivers\CMSIS\Device\ST\STM32F4xx\Include -IC:\U
+sers\User\AppData\Local\Arm\Packs\Keil\STM32F4xx_DFP\2.15.0\Drivers\STM32F4xx_H
+AL_Driver\Inc --predefine="__UVISION_VERSION SETA 528" --predefine="_RTE_ SETA 
+1" --predefine="STM32F429xx SETA 1" --list=.\listings\startup_stm32f429xx.lst R
+TE\Device\STM32F429ZITx\startup_stm32f429xx.s
 
 
 
