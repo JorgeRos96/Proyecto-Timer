@@ -140,7 +140,7 @@ int main(void)
   *            AHB Prescaler                  = 1
   *            APB1 Prescaler                 = 4
   *            APB2 Prescaler                 = 2
-  *            HSE Frequency(Hz)              = 16000000
+  *            HSI Frequency(Hz)              = 16000000
   *            PLL_M                          = 8
   *            PLL_N                          = 180
   *            PLL_P                          = 2
@@ -404,8 +404,14 @@ static void Error_Handler(int fallo)
 		/* Mensaje si se ha producido un error en el envío de datos de la USART*/
 		printf(buf,"\r Se ha producido un error al enviar datos por la USART\n");
 	else if (fallo == 4)
+		/* Mensaje si se ha producido un error en la inicialización del Timer 2*/
+		printf(buf,"\r Se ha producido un error al inicializar el Timer 2\n");
+	else if (fallo == 5)
 		/* Mensaje si se ha producido un error en la inicialización del Timer 3*/
 		printf(buf,"\r Se ha producido un error al inicializar el Timer 3\n");
+	else if (fallo == 6)
+		/* Mensaje si se ha producido un error en la inicialización del Timer 3*/
+		printf(buf,"\r Se ha producido un error al inicializar el Timer 4\n");
 
   while(1)
   {
