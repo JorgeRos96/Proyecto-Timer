@@ -427,6 +427,16 @@
               <FileType>5</FileType>
               <FilePath>.\Delay.h</FilePath>
             </File>
+            <File>
+              <FileName>Watchdog.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Watchdog.c</FilePath>
+            </File>
+            <File>
+              <FileName>Watchdog.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Watchdog.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -495,6 +505,12 @@
         </targetInfos>
       </component>
       <component Cclass="Device" Cgroup="STM32Cube HAL" Csub="GPIO" Cvendor="Keil" Cversion="1.7.9" condition="STM32F4 HAL">
+        <package name="STM32F4xx_DFP" schemaVersion="1.6.3" url="http://www.keil.com/pack/" vendor="Keil" version="2.15.0"/>
+        <targetInfos>
+          <targetInfo name="Target 1"/>
+        </targetInfos>
+      </component>
+      <component Cclass="Device" Cgroup="STM32Cube HAL" Csub="IWDG" Cvendor="Keil" Cversion="1.7.9" condition="STM32F4 HAL">
         <package name="STM32F4xx_DFP" schemaVersion="1.6.3" url="http://www.keil.com/pack/" vendor="Keil" version="2.15.0"/>
         <targetInfos>
           <targetInfo name="Target 1"/>

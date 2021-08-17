@@ -19,10 +19,7 @@
 	*					 Pin de generacion de la señal PWM-> PC6
 	*					 Pin de captura de la señal-> PD12
 	*						
-	*					 Se configura el reloj del sistema para que trabaje a una frecuencia 
-	*					 de 180 MHz utilizando como fuente de reloj el PLL con el HSI. Con 
-	*					 esta frecuencia del sistema se configuran las siguientes frecuencias:
-	*
+	*					 
 	*					 Frecuencia del Timer 2 = 2.4 Hz
 	*					 Frecuencia de la señal PWM generada = 45 kHz
 	*					 Frecuencia del Timer de captura = 1.37 kHz
@@ -44,6 +41,7 @@
 #include "LED.h"
 #include "USART.h"
 #include "Delay.h"
+#include "Watchdog.h"
 
 #ifdef _RTE_
 #include "RTE_Components.h"             // Component selection
@@ -82,7 +80,9 @@ static void MX_TIM4_Init(void);
   */
 int main(void)
 {
-
+	/*Inicialización del IWDG*/
+	if (init_Watchdog() != 0)
+		Error_Handler(7);
   /* STM32F4xx HAL library initialization:
        - Configure the Flash prefetch, Flash preread and Buffer caches
        - Systick timer is configured by default as source of time base, but user 
@@ -136,7 +136,7 @@ int main(void)
   /* Infinite loop */
   while (1)
   {	
-		
+		reset_Watchdog ();
   }
 }
 
@@ -280,7 +280,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 1999;
+  htim3.Init.Period = 1999; 
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 
@@ -421,6 +421,9 @@ static void Error_Handler(int fallo)
 	else if (fallo == 6)
 		/* Mensaje si se ha producido un error en la inicialización del Timer 3*/
 		printf(buf,"\r Se ha producido un error al inicializar el Timer 4\n");
+	else if (fallo == 7)
+		/* Mensaje si se ha producido un error en la inicialización del Watchdog*/
+		printf(buf,"\r Se ha producido un error al inicializar el Watchdog\n");
 
   while(1)
   {
